@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vote — موقع احترافي</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#5eead4; /* mint */
+      --muted:#94a3b8;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box;font-family:'Poppins',sans-serif}
+    body{
+      margin:0;min-height:100vh;background:linear-gradient(180deg,#071022 0%, #0f1724 100%);
+      color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:24px;
+    }
+    .container{max-width:1000px;width:100%;display:grid;grid-template-columns:1fr 420px;gap:24px}
+    .card{background:var(--card);padding:20px;border-radius:14px;box-shadow:0 6px 20px rgba(2,6,23,0.6);
+        backdrop-filter:blur(6px)}
+    .left{display:flex;flex-direction:column;gap:18px}
+    h1{margin:0;font-size:20px;font-weight:600}
+    p.lead{margin:0;color:var(--muted)}
+    .vote-panel{display:flex;align-items:center;gap:14px;padding:18px;background:var(--glass);
+        border-radius:12px}
+    .vote-btn{display:inline-flex;align-items:center;gap:10px;padding:12px 18px;border-radius:10px;
+        border:1px solid rgba(255,255,255,0.04);cursor:pointer;user-select:none;
+        transition:transform .12s,box-shadow .12s}
+        .vote-btn:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,0.45)}
+    .vote-count{font-size:28px;font-weight:700;min-width:68px;text-align:center}
+    .muted-small{font-size:13px;color:var(--muted)}
+    .item-list{display:grid;gap:12px}
+    .item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent)}
+    .item .meta{display:flex;flex-direction:column}
+    .brand{font-weight:600}
+    /* right column (dashboard) */
+    .right{display:flex;flex-direction:column;gap:16px}
+    .chart-wrap{height:260px}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{background:linear-gradient(90deg,var(--accent),#34d399);padding:8px 12px;border-radius:8px;border:none;color:#04201a;font-weight:600;cursor:pointer}
+    footer{margin-top:12px;color:var(--muted);font-size:13px}
+    /* responsiveness */
+    @media (max-width:920px){.container{grid-template-columns:1fr;}.right{order:2}.left{order:1}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card left">
+      <div>
+        <h1>chnewa nala3bou lyem</h1>
+       
+      </div>
+
+      <div class="vote-panel" id="votePanel">
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <button class="vote-btn" id="upvoteBtn">valorant</button>
+        
+        </div>
+
+        <div class="vote-count" id="score">0</div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <button class="vote-btn" id="downvoteBtn">gta rp</button>
+    
+        </div>
+      </div>
+      <div style="margin-top:8px" class="muted-small">حالة: <span id="status">غير متصل</span></div>
+
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.03);margin:14px 0">
+
+      <div>
+        <h3 style="margin:0 0 8px 0">آخر الأصوات</h3>
+        <div class="item-list" id="recentList">
+          <!-- recent votes injected here -->
+        </div>
+      </div>
+
+      <footer>موقعك • Designed by You</footer>
+    </div>
+
+    <div class="card right">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0">لوحة النتائج (Dashboard)</h3>
+          <div class="muted-small">عرض مباشر وتوزيع الأصوات</div>
+        </div>
+        <div class="controls">
+          <button class="btn" id="refreshBtn">تحديث</button>
+        </div>
+      </div>
+
+      <div class="chart-wrap card" style="padding:12px">
+        <canvas id="votesChart"></canvas>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1" class="card">
+          <div class="muted-small">Total Up</div>
+          <div id="totalUp" style="font-size:20px;font-weight:700">0</div>
+        </div>
+        <div style="flex:1" class="card">
+          <div class="muted-small">Total Down</div>
+          <div id="totalDown" style="font-size:20px;font-weight:700">0</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Firebase SDKs (compat for simpler code) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+    /***** ضع إعدادات Firebase متاعك هنا *****/
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_APP.firebaseapp.com",
+      databaseURL: "https://YOUR_APP-default-rtdb.firebaseio.com",
+      projectId: "YOUR_APP",
+      storageBucket: "YOUR_APP.appspot.com",
+      messagingSenderId: "SENDER_ID",
+      appId: "APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+
+    // auth: anonymous
+    let uid = null;
+    auth.signInAnonymously()
+      .then(userCred => {
+        uid = userCred.user.uid;
+        document.getElementById('status').textContent = 'متصل (UID: '+uid.slice(0,6)+'...)';
+        initListeners();
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById('status').textContent = 'خطأ في المصادقة';
+      });
+      // references
+    const votesRef = db.ref('votes'); // all votes as list
+    const aggregateRef = db.ref('aggregate'); // aggregated counts {up: n, down: m}
+    const perUserRef = db.ref('userVotes'); // per-user votes { uid: "up" or "down" }
+
+    // UI elements
+    const upBtn = document.getElementById('upvoteBtn');
+    const downBtn = document.getElementById('downvoteBtn');
+    const scoreEl = document.getElementById('score');
+    const recentList = document.getElementById('recentList');
+    const totalUpEl = document.getElementById('totalUp');
+    const totalDownEl = document.getElementById('totalDown');
+    const refreshBtn = document.getElementById('refreshBtn');
+
+    // Chart setup
+    const ctx = document.getElementById('votesChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Upvotes','Downvotes'],
+        datasets: [{
+          label: 'Votes',
+          data: [0,0],
+          backgroundColor: ['rgba(94,234,212,0.9)','rgba(255,99,132,0.9)'],
+          borderRadius: 8
+        }]
+      },
+      options: {
+        responsive:true,
+        scales:{y:{beginAtZero:true}}
+      }
+    });
+
+    // helper: render aggregate
+    function renderAggregate(data){
+      const up = data && data.up ? data.up : 0;
+      const down = data && data.down ? data.down : 0;
+      scoreEl.textContent = up - down;
+      totalUpEl.textContent = up;
+      totalDownEl.textContent = down;
+      chart.data.datasets[0].data = [up, down];
+      chart.update();
+    }
+// helper: render recent list (last 😎
+    function renderRecent(items){
+      recentList.innerHTML = '';
+      items.slice().reverse().slice(0,8).forEach(it => {
+        const el = document.createElement('div');
+        el.className = 'item';
+        el.innerHTML = `<div class="meta"><div class="brand">${it.vote === 'up' ? '👍 Up' : '👎 Down'}</div><div class="muted-small">${new Date(it.time).toLocaleString()}</div></div><div class="muted-small">${it.uid ? (it.uid.slice(0,6)+'...') : ''}</div>`;
+        recentList.appendChild(el);
+      });
+    }
+
+    // attach listeners once auth done
+    function initListeners(){
+      // load aggregate live
+      aggregateRef.on('value', snap => {
+        renderAggregate(snap.val());
+      });
+
+      // load recent votes (limitToLast)
+      votesRef.limitToLast(30).on('value', snap => {
+        const arr = [];
+        snap.forEach(child => arr.push(child.val()));
+        renderRecent(arr);
+      });
+      // check this user's vote to disable double vote UI
+      perUserRef.child(uid).on('value', snap => {
+        const val = snap.val();
+        upBtn.style.opacity = val === 'up' ? 0.6 : 1;
+        downBtn.style.opacity = val === 'down' ? 0.6 : 1;
+      });
+    }
+
+    // function to submit vote (atomic)
+    function submitVote(choice){
+      if(!uid){ alert('التحق أولاً'); return; }
+
+      const userVoteRef = perUserRef.child(uid);
+      userVoteRef.once('value').then(snap => {
+        const prev = snap.val(); // null | 'up' | 'down'
+        if(prev === choice){
+          // undo vote
+          // remove perUser, decrement aggregate, push entry as 'undo' (optional)
+          const updates = {};
+          updates['/userVotes/'+uid] = null;
+          updates['/aggregate/'+choice] = firebase.database.ServerValue.increment(-1);
+          // push note
+          updates['/votes/'+Date.now()] = { uid, vote: 'undo-'+choice, time: Date.now() };
+          db.ref().update(updates);
+        } else {
+          // change vote: if prev existed, decrement prev; increment choice
+          const updates = {};
+          if(prev) updates['/aggregate/'+prev] = firebase.database.ServerValue.increment(-1);
+          updates['/aggregate/'+choice] = firebase.database.ServerValue.increment(1);
+          updates['/userVotes/'+uid] = choice;
+          updates['/votes/'+Date.now()] = { uid, vote: choice, time: Date.now() };
+          db.ref().update(updates);
+        }
+      });
+    }
+
+    upBtn.addEventListener('click', ()=> submitVote('up'));
+    downBtn.addEventListener('click', ()=> submitVote('down'));
+    refreshBtn.addEventListener('click', ()=> {
+      // manual refresh: read aggregate once
+      aggregateRef.once('value').then(snap => renderAggregate(snap.val()));
+      votesRef.limitToLast(30).once('value').then(snap => {const arr=[]; snap.forEach(c=>arr.push(c.val())); renderRecent(arr);
+      });
+    });
+
+    // init: ensure aggregate exists
+    aggregateRef.once('value').then(snap=>{
+      if(!snap.exists()){
+        aggregateRef.set({up:0,down:0});
+      }
+    });
+  </script>
+</body>
+</html>
